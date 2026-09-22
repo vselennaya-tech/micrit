@@ -44,6 +44,31 @@ void cls() {
     printf("\033[H\033[2J");
     fflush(stdout);
 }
+pid_t spawn_tty(const char *tty_path) {
+    pid_t pid = fork();
+    if (pid == 0) {
+        setsid();
+        int fd = open(tty_path, O_RDWR);
+        if (fd < 0) {
+            fprintf(stderr, "[  ER  ] Cannot open %s\n", tty_path);
+            exit(1);
+        }
+        ioctl(fd, TIOCSCTTY, 1);
+        dup2(fd, 0);
+        dup2(fd, 1);
+        dup2(fd, 2);
+        if (fd > 2) close(fd);
+        cls();
+        setenv("TERM", "linux", 1);
+        setenv("PATH", "/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin", 1);
+        execl("/sbin/login", "login", "-p", NULL);
+        perror("[  ER  ] Failed to start login");
+        exit(1);
+    } else if (pid < 0) {
+        perror("[  ER  ] Fork failed");
+    }
+    return pid; 
+}
 int main() {
     cls();
     printf("\nMicrit v0.01 (C version)\n\n");
@@ -149,35 +174,29 @@ int main() {
     }
     printf("[ INFO ] Finished booting!\n");
     // login
+    const char *tty_devices[] = {
+        "/dev/tty1", "/dev/tty2", "/dev/tty3",
+        "/dev/tty4", "/dev/tty5", "/dev/tty6"
+    };
+    #define NUM_TTYS (sizeof(tty_devices) / sizeof(tty_devices[0]))
+    pid_t tty_pids[NUM_TTYS] = {0};
+    for (int i = 0; i < NUM_TTYS; i++) {
+        tty_pids[i] = spawn_tty(tty_devices[i]);
+    }
     while (1) {
-        pid_t pid = fork();
-        if (pid == 0) {
-            setsid();
-            int fd = open("/dev/tty1", O_RDWR);
-            if (fd < 0) {
-                perror("[  ER  ] Cannot open /dev/tty1");
-                exit(1);
+        int status;
+    // Ждем любой завершившийся TTY без блокировки основного потока
+        pid_t died_pid = waitpid(-1, &status, WNOHANG);
+        if (died_pid > 0) {
+        // Минималистичный поиск: проверяем, наш ли это TTY умер
+            for (int i = 0; i < NUM_TTYS; i++) {
+                if (tty_pids[i] == died_pid) {
+                    tty_pids[i] = spawn_tty(tty_devices[i]);
+                    break;
+                }
             }
-            ioctl(fd, TIOCSCTTY, 1);
-            dup2(fd, 0);
-            dup2(fd, 1);
-            dup2(fd, 2);
-            if (fd > 2) close(fd);
-            printf("[ INFO ] Running login...\n");
-            cls();
-            // adding default environment variables (not doing so causes fish to break)
-            setenv("TERM", "linux", 1);
-            setenv("PATH", "/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin", 1);
-            execl("/sbin/login", "login", "-p", NULL);
-            perror("[  ER  ] Failed to start login");
-            exit(1);
-        } else if (pid > 0) {
-            wait(NULL);
-            cls();
-        } else {
-            perror("[  ER  ] Fork failed");
-            sleep(2);
         }
+        sleep(1);
     }
     return 0;
 }

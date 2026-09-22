@@ -8,6 +8,7 @@ My first project. Minimal Linux init written on C
 - hostnames
 - configs
 - modules on boot
+- 6 tty's
 
 ## What doesn't work?
 - powering off
