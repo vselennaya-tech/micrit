@@ -4,6 +4,8 @@
 #include <fcntl.h>
 #include <string.h>
 #include <ctype.h>
+#include <signal.h>
+#include <sys/reboot.h>
 #include <sys/mount.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -68,6 +70,12 @@ pid_t spawn_tty(const char *tty_path) {
         perror("[  ER  ] Fork failed");
     }
     return pid; 
+}
+volatile sig_atomic_t power_action = 0;
+
+void power_signals(int sig) {
+    if (sig == SIGINT) power_action = 1;
+    if (sig == SIGUSR1) power_action = 2;
 }
 int main() {
     cls();
@@ -172,6 +180,9 @@ int main() {
             iface = strtok(NULL, " ");
         }
     }
+// power signals
+    signal(SIGINT, power_signals);
+    signal(SIGUSR1, power_signals);
     printf("[ INFO ] Finished booting!\n");
     // login
     const char *tty_devices[] = {
@@ -185,16 +196,23 @@ int main() {
     }
     while (1) {
         int status;
-    // Ждем любой завершившийся TTY без блокировки основного потока
         pid_t died_pid = waitpid(-1, &status, WNOHANG);
         if (died_pid > 0) {
-        // Минималистичный поиск: проверяем, наш ли это TTY умер
             for (int i = 0; i < NUM_TTYS; i++) {
                 if (tty_pids[i] == died_pid) {
                     tty_pids[i] = spawn_tty(tty_devices[i]);
                     break;
                 }
             }
+        }
+        if (power_action > 0) {
+            cls();
+            kill(-1, SIGTERM); sleep(2);
+            kill(-1, SIGKILL); sleep(1);
+            sync();
+            NULL, "/", NULL, MS_REMOUNT | MS_RDONLY, NULL;
+            if (power_action == 1) reboot(RB_AUTOBOOT);
+            if (power_action == 2) reboot(RB_POWER_OFF);
         }
         sleep(1);
     }

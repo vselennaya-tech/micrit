@@ -3,15 +3,16 @@ My first project. Minimal Linux init written on C
 
 ## What works?
 - powering on
-- loginning in
-- fish
+- login
 - hostnames
 - configs
 - modules on boot
 - 6 tty's
-
-## What doesn't work?
 - powering off
 - rebooting
+
+## What doesn't work?
+- agetty
+- PAM
 - services
 - etc
