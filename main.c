@@ -79,7 +79,7 @@ void power_signals(int sig) {
 }
 int main() {
     cls();
-    printf("\nMicrit v0.01 (C version)\n\n");
+    printf("\nMicrit Beta-v0.1\n\n");
 // rootchk
     if (getuid() != 0) {
         fprintf(stderr, "[  ER  ] Must be ran as root!\n");
