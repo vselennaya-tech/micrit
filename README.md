@@ -15,6 +15,7 @@ My first project. Minimal Linux init written on C
 - agetty
 - PAM
 - services
+- cgroups (doesn't mount on boot)
 - etc
 
 ## Build instructions
